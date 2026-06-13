@@ -114,31 +114,22 @@ document.getElementById("fileInput")
 
     const reader = new FileReader();
 
-async function loadBook(file) {
+    reader.onload = function(event){
 
-    let text = "";
+        const text = event.target.result;
 
-    text = await file.text();
+        paragraphs = text
+            .split(/\n\s*\n/)
+            .filter(p => p.trim().length > 0);
 
-    if ((text.match(/�/g) || []).length > 5) {
+        currentIndex = 0;
 
-        const buffer = await file.arrayBuffer();
+        saveState();
 
-        const decoder = new TextDecoder("windows-1251");
+        updatePreview();
+    };
 
-        text = decoder.decode(buffer);
-    }
-
-    paragraphs = text
-        .split(/\n\s*\n/)
-        .filter(p => p.trim().length > 0);
-
-    currentIndex = 0;
-
-    saveState();
-
-    updatePreview();
-}
+    reader.readAsText(file);
 });
 
 function speakCurrent(){
@@ -219,16 +210,9 @@ function prevParagraph(){
     }
 }
 
-document.getElementById("fileInput")
-.addEventListener("change", async function(e){
+document.getElementById("rate")
+.addEventListener("input", function(){
 
-    const file = e.target.files[0];
-
-    if(file){
-        await loadBook(file);
-    }
-
-});
     document.getElementById("speedValue")
         .innerHTML =
         this.value + "x";
