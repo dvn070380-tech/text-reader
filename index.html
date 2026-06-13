@@ -1,67 +1,226 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Чтение текста</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Аудиокнига TXT</title>
 
-        textarea {
-            width: 100%;
-            height: 250px;
-            font-size: 18px;
-            padding: 10px;
-            box-sizing: border-box;
-        }
+<style>
+body{
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin:auto;
+    padding:20px;
+}
 
-        button {
-            margin-top: 10px;
-            padding: 12px 20px;
-            font-size: 18px;
-            margin-right: 10px;
-        }
-    </style>
+button{
+    padding:12px;
+    margin:5px;
+    font-size:16px;
+}
+
+textarea{
+    width:100%;
+    height:250px;
+    font-size:18px;
+}
+
+#status{
+    margin-top:10px;
+    font-weight:bold;
+}
+
+input[type=range]{
+    width:100%;
+}
+</style>
 </head>
+
 <body>
 
-    <h2>Чтение текста вслух</h2>
+<h2>📚 TXT Аудиокнига</h2>
 
-    <textarea id="text">
-Введите текст здесь...
-    </textarea>
+<input type="file" id="fileInput" accept=".txt">
 
-    <br>
+<br><br>
 
-    <button onclick="speak()">▶ Читать</button>
-    <button onclick="stopSpeech()">■ Стоп</button>
+<label>Скорость чтения:</label>
+<input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
 
-    <script>
-        let utterance;
+<div id="speedValue">1.0x</div>
 
-        function speak() {
-            speechSynthesis.cancel();
+<br>
 
-            const text = document.getElementById("text").value;
+<button onclick="speakCurrent()">▶ Читать</button>
+<button onclick="pauseSpeech()">⏸ Пауза</button>
+<button onclick="resumeSpeech()">▶ Продолжить</button>
+<button onclick="stopSpeech()">⏹ Стоп</button>
 
-            utterance = new SpeechSynthesisUtterance(text);
+<br>
 
-            // Русский язык
-            utterance.lang = "ru-RU";
+<button onclick="prevParagraph()">⏪ Назад</button>
+<button onclick="nextParagraph()">⏩ Вперёд</button>
 
-            // Скорость (0.1 - 10)
-            utterance.rate = 1.0;
+<div id="status"></div>
 
-            speechSynthesis.speak(utterance);
+<textarea id="preview"></textarea>
+
+<script>
+
+let paragraphs = [];
+let currentIndex = 0;
+let utterance = null;
+
+const preview = document.getElementById("preview");
+const statusDiv = document.getElementById("status");
+
+function saveState(){
+    localStorage.setItem("bookText", JSON.stringify(paragraphs));
+    localStorage.setItem("currentIndex", currentIndex);
+}
+
+function loadState(){
+
+    const savedBook = localStorage.getItem("bookText");
+    const savedIndex = localStorage.getItem("currentIndex");
+
+    if(savedBook){
+        paragraphs = JSON.parse(savedBook);
+        currentIndex = parseInt(savedIndex || 0);
+
+        updatePreview();
+    }
+}
+
+function updatePreview(){
+
+    if(paragraphs.length===0) return;
+
+    preview.value = paragraphs[currentIndex];
+
+    statusDiv.innerHTML =
+        "Абзац "
+        + (currentIndex+1)
+        + " из "
+        + paragraphs.length;
+}
+
+document.getElementById("fileInput")
+.addEventListener("change", function(e){
+
+    const file = e.target.files[0];
+
+    if(!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(event){
+
+        const text = event.target.result;
+
+        paragraphs = text
+            .split(/\n\s*\n/)
+            .filter(p => p.trim().length > 0);
+
+        currentIndex = 0;
+
+        saveState();
+
+        updatePreview();
+    };
+
+    reader.readAsText(file);
+});
+
+function speakCurrent(){
+
+    if(paragraphs.length===0) return;
+
+    speechSynthesis.cancel();
+
+    utterance = new SpeechSynthesisUtterance(
+        paragraphs[currentIndex]
+    );
+
+    utterance.lang = "ru-RU";
+
+    utterance.rate =
+        parseFloat(
+            document.getElementById("rate").value
+        );
+
+    utterance.onend = function(){
+
+        currentIndex++;
+
+        if(currentIndex < paragraphs.length){
+
+            saveState();
+
+            updatePreview();
+
+            speakCurrent();
+
+        }else{
+
+            statusDiv.innerHTML = "Книга закончилась";
         }
+    };
 
-        function stopSpeech() {
-            speechSynthesis.cancel();
-        }
-    </script>
+    speechSynthesis.speak(utterance);
+
+    saveState();
+
+    updatePreview();
+}
+
+function pauseSpeech(){
+    speechSynthesis.pause();
+}
+
+function resumeSpeech(){
+    speechSynthesis.resume();
+}
+
+function stopSpeech(){
+    speechSynthesis.cancel();
+}
+
+function nextParagraph(){
+
+    if(currentIndex < paragraphs.length-1){
+
+        currentIndex++;
+
+        saveState();
+
+        updatePreview();
+    }
+}
+
+function prevParagraph(){
+
+    if(currentIndex > 0){
+
+        currentIndex--;
+
+        saveState();
+
+        updatePreview();
+    }
+}
+
+document.getElementById("rate")
+.addEventListener("input", function(){
+
+    document.getElementById("speedValue")
+        .innerHTML =
+        this.value + "x";
+});
+
+loadState();
+
+</script>
 
 </body>
 </html>
